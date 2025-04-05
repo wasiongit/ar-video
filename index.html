@@ -2,55 +2,38 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AR Video Player</title>
+  <title>AR Video (No Zoom, Continuous Play)</title>
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      font-family: Arial, sans-serif;
-    }
-    #loading {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.8);
-      color: white;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    }
+    body { margin: 0; overflow: hidden; }
     #marker-info {
-      position: absolute;
+      position: fixed;
       bottom: 20px;
-      left: 0;
       width: 100%;
       text-align: center;
       color: white;
-      background: rgba(0,0,0,0.5);
+      background: rgba(0,0,0,0.7);
       padding: 10px;
-      z-index: 999;
+      z-index: 100;
     }
   </style>
 </head>
 <body>
-  <!-- Loading screen -->
-  <div id="loading">
-    <h1>AR Video Player</h1>
-    <p>Loading AR experience...</p>
-    <p>Point your camera at the Hiro marker when ready</p>
-    <img src="assets/hiro-marker.png" width="200" alt="Hiro Marker">
-  </div>
-
-  <!-- AR Scene -->
-  <a-scene embedded arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
-    <!-- Video that appears when marker is detected -->
+  <!-- 👇 Key Change 1: Disable zoom via arjs properties -->
+  <a-scene 
+    embedded 
+    arjs="
+      trackingMethod: best;
+      sourceType: webcam;
+      debugUIEnabled: false;
+      sourceWidth: 1280;  // Normal camera resolution
+      sourceHeight: 720;
+      displayWidth: 1280;
+      displayHeight: 720;
+    ">
+    
+    <!-- Video Marker -->
     <a-marker preset="hiro" id="video-marker">
       <a-video
         id="ar-video"
@@ -59,49 +42,35 @@
         height="0.9"
         position="0 0.5 0"
         rotation="-90 0 0"
-        visible="false"
+        autoplay
+        loop
       ></a-video>
     </a-marker>
     
-    <!-- Camera settings -->
-    <a-entity camera></a-entity>
-    
-    <!-- Simple UI for when marker is detected -->
-    <a-entity id="ui" visible="false">
-      <a-text value="Scan the Hiro marker" 
-              position="0 -0.5 0" 
-              align="center" 
-              color="white"></a-text>
-    </a-entity>
+    <!-- 👇 Key Change 2: Camera settings (no zoom) -->
+    <a-entity camera="fov: 80; zoom: 1;"></a-entity>
   </a-scene>
 
-  <!-- Marker instructions -->
   <div id="marker-info">
-    <p>Point your camera at this marker: <a href="assets/hiro-marker.png" download>Download Hiro Marker</a></p>
+    Point camera at the <a href="assets/hiro-marker.png" download>Hiro Marker</a>
   </div>
 
   <script>
-    // Wait for scene to load
-    document.querySelector('a-scene').addEventListener('loaded', function() {
-      // Hide loading screen
-      document.getElementById('loading').style.display = 'none';
-      
+    document.addEventListener('DOMContentLoaded', () => {
       const video = document.getElementById('ar-video');
-      const marker = document.getElementById('video-marker');
-      const ui = document.getElementById('ui');
       
-      // Show UI when marker is found
-      marker.addEventListener('markerFound', () => {
-        video.setAttribute('visible', 'true');
-        ui.setAttribute('visible', 'false');
-        video.components.material.material.map.image.play();
+      // 👇 Key Change 3: Never pause the video
+      video.addEventListener('playing', () => {
+        console.log("Video started - will now play indefinitely");
       });
       
-      // Hide video when marker is lost
-      marker.addEventListener('markerLost', () => {
-        video.setAttribute('visible', 'false');
-        ui.setAttribute('visible', 'true');
-        video.components.material.material.map.image.pause();
+      // Optional: Force video to continue even if marker is lost
+      document.querySelector('a-marker').addEventListener('markerLost', () => {
+        video.object3D.visible = false; // Hide but don't pause
+      });
+      
+      document.querySelector('a-marker').addEventListener('markerFound', () => {
+        video.object3D.visible = true; // Show again
       });
     });
   </script>
