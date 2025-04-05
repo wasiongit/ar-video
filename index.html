@@ -2,14 +2,15 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>High-Quality AR Video</title>
+  <title>Interactive AR Video</title>
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
   <style>
     body { 
       margin: 0; 
       overflow: hidden; 
       background: #000;
+      touch-action: none;
     }
     #loading {
       position: fixed;
@@ -26,15 +27,57 @@
       z-index: 1000;
       font-family: Arial, sans-serif;
     }
-    #video-container {
+    #ar-container {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+    }
+    #camera-feed {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    #video-controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 100;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 5px;
+      color: white;
+    }
+    .control-btn {
+      margin: 5px;
+      padding: 8px 12px;
+      background: #444;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    #ar-video {
+      position: absolute;
+      max-width: 80%;
+      max-height: 80%;
+      object-fit: contain;
+      cursor: move;
+      touch-action: none;
+    }
+    .resize-handle {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: rgba(255,255,255,0.7);
+      border-radius: 50%;
+      bottom: -10px;
+      right: -10px;
+      cursor: nwse-resize;
     }
   </style>
 </head>
@@ -44,84 +87,125 @@
     <p>Please allow camera access</p>
   </div>
 
-  <div id="video-container">
-    <!-- We'll position our video here via JavaScript -->
+  <div id="ar-container">
+    <video id="camera-feed"></video>
+    <div id="video-wrapper" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%)">
+      <video id="ar-video" src="assets/sample-video.mp4"></video>
+      <div class="resize-handle"></div>
+    </div>
   </div>
 
-  <!-- AR Scene (hidden - we just use it for camera feed) -->
-  <a-scene 
-    embedded 
-    arjs="
-      trackingMethod: best;
-      sourceType: webcam;
-      debugUIEnabled: false;
-      sourceWidth: 1920;  <!-- Higher resolution -->
-      sourceHeight: 1080;
-      displayWidth: 1920;
-      displayHeight: 1080;
-    "
-    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0;"
-    renderer="logarithmicDepthBuffer: true; precision: high;">
-    
-    <!-- Hidden marker (only used for positioning if needed) -->
-    <a-marker preset="hiro" id="video-marker" visible="false"></a-marker>
-    <a-entity camera></a-entity>
-  </a-scene>
+  <div id="video-controls">
+    <button class="control-btn" id="flip-btn">Flip Camera</button>
+    <button class="control-btn" id="reset-btn">Reset Video</button>
+  </div>
 
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const scene = document.querySelector('a-scene');
+    document.addEventListener('DOMContentLoaded', async () => {
       const loadingScreen = document.getElementById('loading');
-      const videoContainer = document.getElementById('video-container');
-      
-      // Create video element
-      const videoEl = document.createElement('video');
-      videoEl.id = 'ar-video';
-      videoEl.src = 'assets/sample-video.mp4';
-      videoEl.autoplay = true;
-      videoEl.loop = true;
-      videoEl.muted = true; // Required for autoplay in most browsers
-      videoEl.playsinline = true; // For iOS
-      videoEl.style.maxWidth = '100%';
-      videoEl.style.maxHeight = '100%';
-      videoEl.style.objectFit = 'contain'; // Maintain aspect ratio
-      
-      videoContainer.appendChild(videoEl);
+      const videoWrapper = document.getElementById('video-wrapper');
+      const arVideo = document.getElementById('ar-video');
+      const cameraFeed = document.getElementById('camera-feed');
+      const resizeHandle = document.querySelector('.resize-handle');
+      const flipBtn = document.getElementById('flip-btn');
+      const resetBtn = document.getElementById('reset-btn');
 
-      // Handle scene load
-      scene.addEventListener('loaded', async () => {
+      // Initialize video
+      arVideo.autoplay = true;
+      arVideo.loop = true;
+      arVideo.muted = true;
+      arVideo.playsinline = true;
+
+      // Get camera access
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            facingMode: 'environment'
+          }
+        });
+        cameraFeed.srcObject = stream;
+        loadingScreen.style.display = 'none';
+
+        // Start video playback
+        await arVideo.play();
+      } catch (err) {
+        console.error("Error:", err);
+        loadingScreen.innerHTML = `<h2>Error</h2><p>${err.message}</p><button onclick="window.location.reload()">Retry</button>`;
+      }
+
+      // Make video interactive
+      let angle = 0;
+      let scale = 1;
+      const initPos = { x: 0, y: 0 };
+
+      interact('#video-wrapper')
+        .draggable({
+          inertia: false,
+          modifiers: [
+            interact.modifiers.restrictRect({
+              restriction: 'parent',
+              endOnly: true
+            })
+          ],
+          listeners: {
+            move(event) {
+              const target = event.target;
+              const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+              const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+
+              target.style.transform = `translate(${x}px, ${y}px) rotate(${angle}deg) scale(${scale})`;
+              target.setAttribute('data-x', x);
+              target.setAttribute('data-y', y);
+            }
+          }
+        })
+        .resizable({
+          edges: { bottom: true, right: true },
+          listeners: {
+            move(event) {
+              const target = event.target;
+              scale = Math.max(0.5, Math.min(3, event.rect.width / target.offsetWidth));
+              target.style.transform = `translate(${target.getAttribute('data-x') || 0}px, ${target.getAttribute('data-y') || 0}px) rotate(${angle}deg) scale(${scale})`;
+            }
+          }
+        });
+
+      // Rotate on double click
+      videoWrapper.addEventListener('dblclick', () => {
+        angle += 45;
+        videoWrapper.style.transform = `translate(${videoWrapper.getAttribute('data-x') || 0}px, ${videoWrapper.getAttribute('data-y') || 0}px) rotate(${angle}deg) scale(${scale})`;
+      });
+
+      // Flip camera
+      flipBtn.addEventListener('click', async () => {
+        const stream = cameraFeed.srcObject;
+        const tracks = stream.getVideoTracks();
+        const currentFacingMode = tracks[0].getSettings().facingMode;
+        
         try {
-          // Start video playback
-          await videoEl.play();
-          
-          // Hide loading screen
-          loadingScreen.style.display = 'none';
-          
-          // Get camera feed from A-Frame and use it as background
-          const cameraFeed = scene.systems.arjs.getSource().domElement;
-          cameraFeed.style.position = 'absolute';
-          cameraFeed.style.top = '0';
-          cameraFeed.style.left = '0';
-          cameraFeed.style.width = '100%';
-          cameraFeed.style.height = '100%';
-          cameraFeed.style.objectFit = 'cover';
-          document.body.insertBefore(cameraFeed, videoContainer);
-          
-          // Optional: Use marker for positioning if found
-          const marker = document.getElementById('video-marker');
-          marker.addEventListener('markerFound', (e) => {
-            // You can add marker-based positioning here if needed
+          const newStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              facingMode: currentFacingMode === 'user' ? 'environment' : 'user'
+            }
           });
-          
+          cameraFeed.srcObject = newStream;
+          tracks.forEach(track => track.stop());
         } catch (err) {
-          console.error("Video playback failed:", err);
-          loadingScreen.innerHTML = `<h2>Error</h2><p>${err.message}</p><button onclick="window.location.reload()">Retry</button>`;
+          console.error("Error flipping camera:", err);
         }
       });
 
-      // Click-to-play fallback
-      videoEl.addEventListener('click', () => {
-        videoEl.play().catch(e => console.log("Playback error:", e));
+      // Reset video position
+      resetBtn.addEventListener('click', () => {
+        angle = 0;
+        scale = 1;
+        videoWrapper.style.transform = 'translate(-50%, -50%) rotate(0deg) scale(1)';
+        videoWrapper.removeAttribute('data-x');
+        videoWrapper.removeAttribute('data-y');
       });
     });
   </script>
