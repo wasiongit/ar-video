@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AR Video Player</title>
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    #loading {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    #marker-info {
+      position: absolute;
+      bottom: 20px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      color: white;
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading screen -->
+  <div id="loading">
+    <h1>AR Video Player</h1>
+    <p>Loading AR experience...</p>
+    <p>Point your camera at the Hiro marker when ready</p>
+    <img src="assets/hiro-marker.png" width="200" alt="Hiro Marker">
+  </div>
+
+  <!-- AR Scene -->
+  <a-scene embedded arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
+    <!-- Video that appears when marker is detected -->
+    <a-marker preset="hiro" id="video-marker">
+      <a-video
+        id="ar-video"
+        src="assets/sample-video.mp4"
+        width="1.6"
+        height="0.9"
+        position="0 0.5 0"
+        rotation="-90 0 0"
+        visible="false"
+      ></a-video>
+    </a-marker>
+    
+    <!-- Camera settings -->
+    <a-entity camera></a-entity>
+    
+    <!-- Simple UI for when marker is detected -->
+    <a-entity id="ui" visible="false">
+      <a-text value="Scan the Hiro marker" 
+              position="0 -0.5 0" 
+              align="center" 
+              color="white"></a-text>
+    </a-entity>
+  </a-scene>
+
+  <!-- Marker instructions -->
+  <div id="marker-info">
+    <p>Point your camera at this marker: <a href="assets/hiro-marker.png" download>Download Hiro Marker</a></p>
+  </div>
+
+  <script>
+    // Wait for scene to load
+    document.querySelector('a-scene').addEventListener('loaded', function() {
+      // Hide loading screen
+      document.getElementById('loading').style.display = 'none';
+      
+      const video = document.getElementById('ar-video');
+      const marker = document.getElementById('video-marker');
+      const ui = document.getElementById('ui');
+      
+      // Show UI when marker is found
+      marker.addEventListener('markerFound', () => {
+        video.setAttribute('visible', 'true');
+        ui.setAttribute('visible', 'false');
+        video.components.material.material.map.image.play();
+      });
+      
+      // Hide video when marker is lost
+      marker.addEventListener('markerLost', () => {
+        video.setAttribute('visible', 'false');
+        ui.setAttribute('visible', 'true');
+        video.components.material.material.map.image.pause();
+      });
+    });
+  </script>
+</body>
+</html>
