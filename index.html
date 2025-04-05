@@ -2,11 +2,15 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Always-On AR Video</title>
+  <title>High-Quality AR Video</title>
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
-    body { margin: 0; overflow: hidden; }
+    body { 
+      margin: 0; 
+      overflow: hidden; 
+      background: #000;
+    }
     #loading {
       position: fixed;
       top: 0;
@@ -16,77 +20,108 @@
       background: #000;
       color: white;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       z-index: 1000;
       font-family: Arial, sans-serif;
     }
+    #video-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
   </style>
 </head>
 <body>
   <div id="loading">
-    Loading AR experience...
+    <h2>Loading AR Experience...</h2>
+    <p>Please allow camera access</p>
   </div>
 
-  <!-- AR Scene with normal camera settings -->
+  <div id="video-container">
+    <!-- We'll position our video here via JavaScript -->
+  </div>
+
+  <!-- AR Scene (hidden - we just use it for camera feed) -->
   <a-scene 
     embedded 
     arjs="
       trackingMethod: best;
       sourceType: webcam;
       debugUIEnabled: false;
-      sourceWidth: 1280;
-      sourceHeight: 720;
+      sourceWidth: 1920;  <!-- Higher resolution -->
+      sourceHeight: 1080;
+      displayWidth: 1920;
+      displayHeight: 1080;
     "
-    renderer="logarithmicDepthBuffer: true;">
-
-    <!-- Video Element (always visible) -->
-    <a-video
-      id="ar-video"
-      src="assets/sample-video.mp4"
-      width="1.6"
-      height="0.9"
-      position="0 0 0"
-      rotation="-90 0 0"
-      autoplay
-      loop
-      visible="true"
-    ></a-video>
-
-    <!-- Marker (optional - just for positioning) -->
-    <a-marker preset="hiro" id="video-marker" visible="false">
-      <!-- Empty - we just use it for coordinates -->
-    </a-marker>
-
-    <!-- Camera with normal FOV -->
-    <a-entity camera="fov: 80;"></a-entity>
+    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0;"
+    renderer="logarithmicDepthBuffer: true; precision: high;">
+    
+    <!-- Hidden marker (only used for positioning if needed) -->
+    <a-marker preset="hiro" id="video-marker" visible="false"></a-marker>
+    <a-entity camera></a-entity>
   </a-scene>
 
   <script>
-    window.addEventListener('load', () => {
+    document.addEventListener('DOMContentLoaded', () => {
       const scene = document.querySelector('a-scene');
-      const video = document.getElementById('ar-video');
       const loadingScreen = document.getElementById('loading');
+      const videoContainer = document.getElementById('video-container');
+      
+      // Create video element
+      const videoEl = document.createElement('video');
+      videoEl.id = 'ar-video';
+      videoEl.src = 'assets/sample-video.mp4';
+      videoEl.autoplay = true;
+      videoEl.loop = true;
+      videoEl.muted = true; // Required for autoplay in most browsers
+      videoEl.playsinline = true; // For iOS
+      videoEl.style.maxWidth = '100%';
+      videoEl.style.maxHeight = '100%';
+      videoEl.style.objectFit = 'contain'; // Maintain aspect ratio
+      
+      videoContainer.appendChild(videoEl);
 
-      // Wait for scene to initialize
-      scene.addEventListener('loaded', () => {
-        loadingScreen.style.display = 'none';
-        
-        // Force video to play (mobile browsers require this)
-        const videoElement = video.components.material.material.map.image;
-        videoElement.play().catch(e => console.log("Auto-play prevented:", e));
-        
-        // Optional: Use marker position if found
-        const marker = document.getElementById('video-marker');
-        marker.addEventListener('markerFound', (e) => {
-          // Snap video to marker position when detected
-          video.setAttribute('position', e.detail.target.object3D.position);
-        });
+      // Handle scene load
+      scene.addEventListener('loaded', async () => {
+        try {
+          // Start video playback
+          await videoEl.play();
+          
+          // Hide loading screen
+          loadingScreen.style.display = 'none';
+          
+          // Get camera feed from A-Frame and use it as background
+          const cameraFeed = scene.systems.arjs.getSource().domElement;
+          cameraFeed.style.position = 'absolute';
+          cameraFeed.style.top = '0';
+          cameraFeed.style.left = '0';
+          cameraFeed.style.width = '100%';
+          cameraFeed.style.height = '100%';
+          cameraFeed.style.objectFit = 'cover';
+          document.body.insertBefore(cameraFeed, videoContainer);
+          
+          // Optional: Use marker for positioning if found
+          const marker = document.getElementById('video-marker');
+          marker.addEventListener('markerFound', (e) => {
+            // You can add marker-based positioning here if needed
+          });
+          
+        } catch (err) {
+          console.error("Video playback failed:", err);
+          loadingScreen.innerHTML = `<h2>Error</h2><p>${err.message}</p><button onclick="window.location.reload()">Retry</button>`;
+        }
       });
 
-      // Fallback: If video doesn't autoplay, add play button
-      video.addEventListener('click', () => {
-        video.components.material.material.map.image.play();
+      // Click-to-play fallback
+      videoEl.addEventListener('click', () => {
+        videoEl.play().catch(e => console.log("Playback error:", e));
       });
     });
   </script>
