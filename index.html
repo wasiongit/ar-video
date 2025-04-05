@@ -2,14 +2,13 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Stable AR Video Player</title>
+  <title>AR Video - GitHub Pages</title>
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
     body {
       margin: 0;
       overflow: hidden;
-      background: #000;
     }
     #loading {
       position: absolute;
@@ -17,7 +16,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0,0,0,0.8);
+      background: #000;
       color: white;
       display: flex;
       flex-direction: column;
@@ -25,84 +24,76 @@
       align-items: center;
       z-index: 1000;
     }
-    #marker-info {
-      position: absolute;
-      bottom: 20px;
+    .arjs-loader {
+      height: 100%;
       width: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      background-color: rgba(0, 0, 0, 0.8);
+      z-index: 9999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .arjs-loader div {
       text-align: center;
+      font-size: 1.25em;
       color: white;
-      background: rgba(0,0,0,0.5);
-      padding: 10px;
     }
   </style>
 </head>
 <body>
   <div id="loading">
-    <h2>AR Video Player</h2>
-    <p>Point camera at the Hiro marker</p>
-    <img src="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png" width="150" alt="Hiro Marker">
+    <h2>AR Video Experience</h2>
+    <p>Loading...</p>
   </div>
 
-  <!-- AR Scene with fixed camera settings -->
+  <div class="arjs-loader">
+    <div>Point camera at your custom marker</div>
+  </div>
+
   <a-scene 
+    vr-mode-ui="enabled: false"
     embedded 
     arjs="
-      trackingMethod: best;
       sourceType: webcam;
-      debugUIEnabled: false;
       sourceWidth: 1280;
       sourceHeight: 720;
       displayWidth: 1280;
       displayHeight: 720;
-    "
-    renderer="logarithmicDepthBuffer: true;">
+      trackingMethod: best;
+    ">
     
-    <!-- Video (maintains aspect ratio via height/width ratio) -->
-    <a-marker preset="hiro" id="video-marker">
+    <!-- Custom marker pattern -->
+    <a-marker type="pattern" url="assets/hiro.patt">
       <a-video
-        id="ar-video"
         src="assets/sample-video.mp4"
-        width="1.6"  <!-- 16:9 ratio -->
-        height="0.9" <!-- 16:9 ratio -->
+        width="1.6"
+        height="0.9"
         position="0 0 0"
         rotation="-90 0 0"
         autoplay
         loop
+        opacity="0.9"
       ></a-video>
     </a-marker>
     
-    <!-- Normal camera FOV (no zoom) -->
-    <a-entity camera="fov: 80; zoom: 1;"></a-entity>
+    <a-entity camera></a-entity>
   </a-scene>
 
-  <div id="marker-info">
-    Download marker: <a href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png" download>Hiro Marker</a>
-  </div>
-
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const scene = document.querySelector('a-scene');
-      const video = document.getElementById('ar-video');
-      const loadingScreen = document.getElementById('loading');
-      
-      scene.addEventListener('loaded', () => {
-        loadingScreen.style.display = 'none';
-        
-        // Video will continue playing even if marker is lost
-        document.getElementById('video-marker').addEventListener('markerFound', () => {
-          video.setAttribute('visible', 'true');
-          video.components.material.material.map.image.play();
-        });
-        
-        // Only hide (don't pause) when marker lost
-        document.getElementById('video-marker').addEventListener('markerLost', () => {
-          video.setAttribute('visible', 'false');
-        });
+    window.addEventListener('DOMContentLoaded', () => {
+      // Hide loader when AR is ready
+      document.querySelector('a-scene').addEventListener('loaded', () => {
+        document.getElementById('loading').style.display = 'none';
+        document.querySelector('.arjs-loader').style.display = 'none';
       });
       
-      // Force video to play (mobile workaround)
-      video.addEventListener('click', () => {
-        video.components.material.material.map.image.play();
+      // Force video play on mobile
+      document.querySelector('a-video').addEventListener('click', () => {
+        const vid = document.querySelector('a-video').components.material.material.map.image;
+        vid.play();
       });
     });
   </script>
